@@ -32,7 +32,7 @@
 #include "rx_alsalib.h"
 #include "rx_rtplib.h"
 #include "tx_alsalib.h"
-#include "tx_rtplib.h"
+#include "tx_runlib.h"
 #include "trx_rtplib.h"
 
 unsigned int verbose = DEFAULT_VERBOSE;

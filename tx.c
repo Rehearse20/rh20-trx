@@ -31,6 +31,7 @@
 #include "sched.h"
 #include "tx_alsalib.h"
 #include "tx_rtplib.h"
+#include "tx_runlib.h"
 
 unsigned int verbose = DEFAULT_VERBOSE;
 

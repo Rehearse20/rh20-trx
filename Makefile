@@ -17,13 +17,13 @@ LDLIBS += $(LDLIBS_ASOUND) $(LDLIBS_OPUS) $(LDLIBS_ORTP)
 
 .PHONY:		all install dist clean
 
-all:	rx tx trx
+all:		rx tx trx
 
 rx:		rx.o device.o sched.o rx_alsalib.o rx_rtplib.o
 
-tx:		tx.o device.o sched.o tx_alsalib.o tx_rtplib.o
+tx:		tx.o device.o sched.o tx_alsalib.o tx_rtplib.o tx_runlib.o
 
-trx:	trx.o device.o sched.o rx_alsalib.o rx_rtplib.o tx_alsalib.o tx_rtplib.o trx_rtplib.o
+trx:		trx.o device.o sched.o rx_alsalib.o rx_rtplib.o tx_alsalib.o tx_runlib.o trx_rtplib.o
 
 install:	rx tx
 		$(INSTALL) -d $(DESTDIR)$(BINDIR)
