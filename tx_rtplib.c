@@ -1,7 +1,6 @@
-#include "tx_rtplib.h"
-#include "tx_alsalib.h"
+#include <assert.h>
 
-extern unsigned int verbose;
+#include "tx_rtplib.h"
 
 RtpSession* create_rtp_send(const char *addr_desc, const int port)
 {
