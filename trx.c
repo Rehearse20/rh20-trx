@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
 	for (;;) {
 		int c;
 
-		c = getopt(argc, argv, "b:c:d:f:h:j:m:p:r:s:v:D:");
+		c = getopt(argc, argv, "b:c:d:f:h:j:m:p:r:s:v:D:S:");
 		if (c == -1)
 			break;
 
@@ -143,6 +143,10 @@ int main(int argc, char *argv[])
 			break;
 		case 's':
 			tx_port = atoi(optarg);
+			break;
+		case 'S':
+		  ssrc = atoi(optarg);
+			break;
 		case 'v':
 			verbose = atoi(optarg);
 			break;
