@@ -3,4 +3,5 @@
 *.d
 tx
 rx
+trx
 test-jitter
