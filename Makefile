@@ -19,7 +19,7 @@ LDLIBS += $(LDLIBS_ASOUND) $(LDLIBS_OPUS) $(LDLIBS_ORTP)
 
 all:		rx tx
 
-rx:		rx.o device.o sched.o
+rx:		rx.o device.o sched.o rx_alsalib.o rx_rtplib.o
 
 tx:		tx.o device.o sched.o
 
