@@ -58,6 +58,8 @@ static void usage(FILE *fd)
 		DEFAULT_PORT);
 	fprintf(fd, "  -j <ms>     Jitter buffer (default %d milliseconds)\n",
 		DEFAULT_JITTER);
+	fprintf(fd, "  -S <ssrc>   SSRC (default 0x%x)\n",
+		DEFAULT_SSRC);
 
 	fprintf(fd, "\nEncoding parameters:\n");
 	fprintf(fd, "  -r <rate>   Sample rate (default %dHz)\n",
@@ -100,6 +102,7 @@ int main(int argc, char *argv[])
 		kbps = DEFAULT_BITRATE,
 		rx_port = DEFAULT_PORT,
 		tx_port = DEFAULT_PORT;
+	uint32_t ssrc = DEFAULT_SSRC;
 
 	fputs(COPYRIGHT "\n", stderr);
 
@@ -176,7 +179,7 @@ int main(int argc, char *argv[])
 	ortp_init();
 	ortp_scheduler_init();
 	ortp_set_log_level_mask(NULL, ORTP_WARNING|ORTP_ERROR);
-	rx.session  = tx.session = create_rtp_send_recv(tx_addr, tx_port, "0.0.0.0", rx_port, jitter);
+	rx.session  = tx.session = create_rtp_send_recv(tx_addr, tx_port, "0.0.0.0", rx_port, jitter, ssrc);
 	assert(rx.session != NULL);
 
 	r = snd_pcm_open(&tx.snd, device, SND_PCM_STREAM_CAPTURE, 0);

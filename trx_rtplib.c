@@ -12,7 +12,8 @@ static void timestamp_jump(RtpSession *session, void *a, void *b, void *c)
 }
 
 RtpSession* create_rtp_send_recv(const char *tx_addr_desc, const int tx_port,
-		const char *rx_addr_desc, const int rx_port, unsigned int jitter)
+		const char *rx_addr_desc, const int rx_port,
+		unsigned int jitter, uint32_t ssrc)
 {
 	RtpSession *session;
 
@@ -22,6 +23,7 @@ RtpSession* create_rtp_send_recv(const char *tx_addr_desc, const int tx_port,
 	rtp_session_set_scheduling_mode(session, FALSE);
 	rtp_session_set_blocking_mode(session, FALSE);
 	rtp_session_set_connected_mode(session, FALSE);
+	rtp_session_set_ssrc(session, ssrc);
 
 	if (rtp_session_set_payload_type(session, 0) != 0)
 		abort();
