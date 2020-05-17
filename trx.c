@@ -30,7 +30,7 @@
 #include "notice.h"
 #include "sched.h"
 #include "rx_alsalib.h"
-#include "rx_rtplib.h"
+#include "rx_runlib.h"
 #include "tx_alsalib.h"
 #include "tx_runlib.h"
 #include "trx_rtplib.h"
