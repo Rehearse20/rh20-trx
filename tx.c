@@ -74,11 +74,10 @@ static void usage(FILE *fd)
 int main(int argc, char *argv[])
 {
 	int r, error;
-	size_t bytes_per_frame;
-	unsigned int ts_per_frame;
-	snd_pcm_t *snd;
-	OpusEncoder *encoder;
-	RtpSession *session;
+	tx_args tx = {
+		.channels = DEFAULT_CHANNELS,
+		.frame = DEFAULT_FRAME,
+	};
 
 	/* command-line options */
 	const char *device = DEFAULT_DEVICE,
@@ -86,8 +85,6 @@ int main(int argc, char *argv[])
 		*pid = NULL;
 	unsigned int buffer = DEFAULT_BUFFER,
 		rate = DEFAULT_RATE,
-		channels = DEFAULT_CHANNELS,
-		frame = DEFAULT_FRAME,
 		kbps = DEFAULT_BITRATE,
 		port = DEFAULT_PORT;
 
@@ -105,13 +102,13 @@ int main(int argc, char *argv[])
 			kbps = atoi(optarg);
 			break;
 		case 'c':
-			channels = atoi(optarg);
+			tx.channels = atoi(optarg);
 			break;
 		case 'd':
 			device = optarg;
 			break;
 		case 'f':
-			frame = atol(optarg);
+			tx.frame = atol(optarg);
 			break;
 		case 'h':
 			addr = optarg;
@@ -137,51 +134,50 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	encoder = opus_encoder_create(rate, channels, OPUS_APPLICATION_AUDIO,
+	tx.encoder = opus_encoder_create(rate, tx.channels, OPUS_APPLICATION_AUDIO,
 				&error);
-	if (encoder == NULL) {
+	if (tx.encoder == NULL) {
 		fprintf(stderr, "opus_encoder_create: %s\n",
 			opus_strerror(error));
 		return -1;
 	}
 
-	bytes_per_frame = kbps * 1024 * frame / rate / 8;
+	tx.bytes_per_frame = kbps * 1024 * tx.frame / rate / 8;
 
 	/* Follow the RFC, payload 0 has 8kHz reference rate */
 
-	ts_per_frame = frame * 8000 / rate;
+	tx.ts_per_frame = tx.frame * 8000 / rate;
 
 	ortp_init();
 	ortp_scheduler_init();
 	ortp_set_log_level_mask(NULL, ORTP_WARNING|ORTP_ERROR);
-	session = create_rtp_send(addr, port);
-	assert(session != NULL);
+	tx.session = create_rtp_send(addr, port);
+	assert(tx.session != NULL);
 
-	r = snd_pcm_open(&snd, device, SND_PCM_STREAM_CAPTURE, 0);
+	r = snd_pcm_open(&tx.snd, device, SND_PCM_STREAM_CAPTURE, 0);
 	if (r < 0) {
 		aerror("snd_pcm_open", r);
 		return -1;
 	}
-	if (set_alsa_hw(snd, rate, channels, buffer * 1000) == -1)
+	if (set_alsa_hw(tx.snd, rate, tx.channels, buffer * 1000) == -1)
 		return -1;
-	if (set_alsa_sw(snd) == -1)
+	if (set_alsa_sw(tx.snd) == -1)
 		return -1;
 
 	if (pid)
 		go_daemon(pid);
 
 	go_realtime();
-	r = run_tx(snd, channels, frame, encoder, bytes_per_frame,
-		ts_per_frame, session);
+	r = run_tx(&tx);
 
-	if (snd_pcm_close(snd) < 0)
+	if (snd_pcm_close(tx.snd) < 0)
 		abort();
 
-	rtp_session_destroy(session);
+	rtp_session_destroy(tx.session);
 	ortp_exit();
 	ortp_global_stats_display();
 
-	opus_encoder_destroy(encoder);
+	opus_encoder_destroy(tx.encoder);
 
 	return r;
 }

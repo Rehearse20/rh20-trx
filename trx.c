@@ -80,23 +80,21 @@ static void usage(FILE *fd)
 int main(int argc, char *argv[])
 {
 	int r, error;
-	size_t bytes_per_frame;
-	unsigned int ts_per_frame;
-	snd_pcm_t *tx_snd;
-	snd_pcm_t *rx_snd;
-	OpusEncoder *encoder;
-	OpusDecoder *decoder;
-	RtpSession *session;
+	tx_args tx = {
+		.channels = DEFAULT_CHANNELS,
+		.frame = DEFAULT_FRAME,
+	};
+	rx_args rx = {
+		.channels = DEFAULT_CHANNELS,
+		.rate = DEFAULT_RATE
+	};
 
 	/* command-line options */
 	const char *device = DEFAULT_DEVICE,
 		*tx_addr = DEFAULT_ADDR,
 		*pid = NULL;
 	unsigned int buffer = DEFAULT_BUFFER,
-		rate = DEFAULT_RATE,
 		jitter = DEFAULT_JITTER,
-		channels = DEFAULT_CHANNELS,
-		frame = DEFAULT_FRAME,
 		kbps = DEFAULT_BITRATE,
 		rx_port = DEFAULT_PORT,
 		tx_port = DEFAULT_PORT;
@@ -115,13 +113,13 @@ int main(int argc, char *argv[])
 			kbps = atoi(optarg);
 			break;
 		case 'c':
-			channels = atoi(optarg);
+			rx.channels = tx.channels = atoi(optarg);
 			break;
 		case 'd':
 			device = optarg;
 			break;
 		case 'f':
-			frame = atol(optarg);
+			tx.frame = atol(optarg);
 			break;
 		case 'h':
 			tx_addr = optarg;
@@ -136,7 +134,7 @@ int main(int argc, char *argv[])
 			rx_port = atoi(optarg);
 			break;
 		case 'r':
-			rate = atoi(optarg);
+			rx.rate = atoi(optarg);
 			break;
 		case 's':
 			tx_port = atoi(optarg);
@@ -152,51 +150,51 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	encoder = opus_encoder_create(rate, channels, OPUS_APPLICATION_AUDIO,
+	tx.encoder = opus_encoder_create(rx.rate, tx.channels, OPUS_APPLICATION_AUDIO,
 				&error);
-	if (encoder == NULL) {
+	if (tx.encoder == NULL) {
 		fprintf(stderr, "opus_encoder_create: %s\n",
 			opus_strerror(error));
 		return -1;
 	}
 
-	decoder = opus_decoder_create(rate, channels, &error);
-	if (decoder == NULL) {
+	rx.decoder = opus_decoder_create(rx.rate, rx.channels, &error);
+	if (rx.decoder == NULL) {
 		fprintf(stderr, "opus_decoder_create: %s\n",
 			opus_strerror(error));
 		return -1;
 	}
 
-	bytes_per_frame = kbps * 1024 * frame / rate / 8;
+	tx.bytes_per_frame = kbps * 1024 * tx.frame / rx.rate / 8;
 
 	/* Follow the RFC, payload 0 has 8kHz reference rate */
 
-	ts_per_frame = frame * 8000 / rate;
+	tx.ts_per_frame = tx.frame * 8000 / rx.rate;
 
 	ortp_init();
 	ortp_scheduler_init();
 	ortp_set_log_level_mask(NULL, ORTP_WARNING|ORTP_ERROR);
-	session = create_rtp_send_recv(tx_addr, tx_port, "0.0.0.0", rx_port, jitter);
-	assert(session != NULL);
+	rx.session  = tx.session = create_rtp_send_recv(tx_addr, tx_port, "0.0.0.0", rx_port, jitter);
+	assert(rx.session != NULL);
 
-	r = snd_pcm_open(&tx_snd, device, SND_PCM_STREAM_CAPTURE, 0);
+	r = snd_pcm_open(&tx.snd, device, SND_PCM_STREAM_CAPTURE, 0);
 	if (r < 0) {
 		aerror("snd_pcm_open", r);
 		return -1;
 	}
-	if (set_alsa_hw(tx_snd, rate, channels, buffer * 1000) == -1)
+	if (set_alsa_hw(tx.snd, rx.rate, tx.channels, buffer * 1000) == -1)
 		return -1;
-	if (set_alsa_sw(tx_snd) == -1)
+	if (set_alsa_sw(tx.snd) == -1)
 		return -1;
 
-	r = snd_pcm_open(&rx_snd, device, SND_PCM_STREAM_PLAYBACK, 0);
+	r = snd_pcm_open(&rx.snd, device, SND_PCM_STREAM_PLAYBACK, 0);
 	if (r < 0) {
 		aerror("snd_pcm_open", r);
 		return -1;
 	}
-	if (set_alsa_hw(rx_snd, rate, channels, buffer * 1000) == -1)
+	if (set_alsa_hw(rx.snd, rx.rate, rx.channels, buffer * 1000) == -1)
 		return -1;
-	if (set_alsa_sw(rx_snd) == -1)
+	if (set_alsa_sw(rx.snd) == -1)
 		return -1;
 
 	if (pid)
@@ -204,23 +202,21 @@ int main(int argc, char *argv[])
 
 	go_realtime();
 
-	r = run_tx(tx_snd, channels, frame, encoder, bytes_per_frame,
-		ts_per_frame, session);
+	r = run_tx(&tx);
+	r = run_rx(&rx);
 
-	r = run_rx(session, decoder, rx_snd, channels, rate);
-
-	if (snd_pcm_close(tx_snd) < 0)
+	if (snd_pcm_close(tx.snd) < 0)
 		abort();
 
-	if (snd_pcm_close(rx_snd) < 0)
+	if (snd_pcm_close(rx.snd) < 0)
 		abort();
 
-	rtp_session_destroy(session);
+	rtp_session_destroy(rx.session);
 	ortp_exit();
 	ortp_global_stats_display();
 
-	opus_encoder_destroy(encoder);
-	opus_decoder_destroy(decoder);
+	opus_encoder_destroy(tx.encoder);
+	opus_decoder_destroy(rx.decoder);
 
 	return r;
 }

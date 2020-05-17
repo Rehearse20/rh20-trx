@@ -5,14 +5,16 @@
 #include <opus/opus.h>
 #include <ortp/ortp.h>
 
-RtpSession* create_rtp_send(const char *addr_desc, const int port);
+typedef struct {
+	snd_pcm_t *snd;
+	unsigned int channels;
+	snd_pcm_uframes_t frame;
+	OpusEncoder *encoder;
+	size_t bytes_per_frame;
+	unsigned int ts_per_frame;
+	RtpSession *session;
+} tx_args;
 
-int run_tx(snd_pcm_t *snd,
-		const unsigned int channels,
-		const snd_pcm_uframes_t frame,
-		OpusEncoder *encoder,
-		const size_t bytes_per_frame,
-		const unsigned int ts_per_frame,
-		RtpSession *session);
+int run_tx(tx_args *args);
 
 #endif
