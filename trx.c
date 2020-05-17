@@ -22,6 +22,7 @@
 #include <alsa/asoundlib.h>
 #include <opus/opus.h>
 #include <ortp/ortp.h>
+#include <pthread.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
@@ -88,6 +89,7 @@ int main(int argc, char *argv[])
 		.channels = DEFAULT_CHANNELS,
 		.rate = DEFAULT_RATE
 	};
+	pthread_t tx_thread, rx_thread;
 
 	/* command-line options */
 	const char *device = DEFAULT_DEVICE,
@@ -202,8 +204,11 @@ int main(int argc, char *argv[])
 
 	go_realtime();
 
-	r = run_tx(&tx);
-	r = run_rx(&rx);
+	pthread_create(&tx_thread, NULL, (void * (*)(void *))run_tx, &tx);
+	pthread_create(&rx_thread, NULL, (void * (*)(void *))run_rx, &rx);
+
+	pthread_join(tx_thread, NULL);
+	pthread_join(rx_thread, NULL);
 
 	if (snd_pcm_close(tx.snd) < 0)
 		abort();

@@ -3,7 +3,7 @@
 
 extern unsigned int verbose;
 
-int run_rx(rx_args *rx)
+void *run_rx(rx_args *rx)
 {
 	int ts = 0;
 
@@ -28,7 +28,7 @@ int run_rx(rx_args *rx)
 
 		r = play_one_frame(packet, r, rx->decoder, rx->snd, rx->channels);
 		if (r == -1)
-			return -1;
+			return (void *)-1;
 
 		/* Follow the RFC, payload 0 has 8kHz reference rate */
 

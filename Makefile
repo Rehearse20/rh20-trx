@@ -10,10 +10,11 @@ BINDIR ?= $(PREFIX)/bin
 CFLAGS += -MMD -Wall
 
 LDLIBS_ASOUND ?= -lasound
+LDLIBS_PTHREAD ?= -lpthread
 LDLIBS_OPUS ?= -lopus
 LDLIBS_ORTP ?= -lortp
 
-LDLIBS += $(LDLIBS_ASOUND) $(LDLIBS_OPUS) $(LDLIBS_ORTP)
+LDLIBS += $(LDLIBS_ASOUND) $(LDLIBS_PTHREAD) $(LDLIBS_OPUS) $(LDLIBS_ORTP)
 
 .PHONY:		all install dist clean
 

@@ -3,7 +3,7 @@
 
 extern unsigned int verbose;
 
-int run_tx(tx_args *tx)
+void *run_tx(tx_args *tx)
 {
 	for (;;) {
 		int r;
@@ -12,7 +12,7 @@ int run_tx(tx_args *tx)
 				tx->encoder, tx->bytes_per_frame, tx->ts_per_frame,
 				tx->session);
 		if (r == -1)
-			return -1;
+			return (void *)-1;
 
 		if (verbose > 1)
 			fputc('>', stderr);

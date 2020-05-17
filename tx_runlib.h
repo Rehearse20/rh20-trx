@@ -15,6 +15,6 @@ typedef struct {
 	RtpSession *session;
 } tx_args;
 
-int run_tx(tx_args *args);
+void *run_tx(tx_args *args);
 
 #endif

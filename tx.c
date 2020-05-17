@@ -168,7 +168,7 @@ int main(int argc, char *argv[])
 		go_daemon(pid);
 
 	go_realtime();
-	r = run_tx(&tx);
+	r = (int)run_tx(&tx);
 
 	if (snd_pcm_close(tx.snd) < 0)
 		abort();

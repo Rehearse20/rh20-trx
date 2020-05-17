@@ -13,6 +13,6 @@ typedef struct {
 	unsigned int rate;
 } rx_args;
 
-int run_rx(rx_args *args);
+void *run_rx(rx_args *args);
 
 #endif
