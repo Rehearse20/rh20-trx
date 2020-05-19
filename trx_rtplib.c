@@ -37,7 +37,7 @@ RtpSession* create_rtp_send_recv(const char *tx_addr_desc, const int tx_port,
 		abort();
 
 	/* rx */
-	if (rtp_session_set_local_addr(session, rx_addr_desc, rx_port, -1) != 0)
+	if (rtp_session_set_local_addr(session, rx_addr_desc, rx_port, rx_port + 1) != 0)
 		abort();
 	rtp_session_enable_adaptive_jitter_compensation(session, TRUE);
 	rtp_session_set_jitter_compensation(session, jitter); /* ms */
