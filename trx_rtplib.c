@@ -25,7 +25,8 @@ RtpSession* create_rtp_send_recv(const char *tx_addr_desc, const int tx_port,
 	rtp_session_set_connected_mode(session, FALSE);
 	rtp_session_set_ssrc(session, ssrc);
 
-	if (rtp_session_set_payload_type(session, 0) != 0)
+	rtp_profile_set_payload(&av_profile, 120, &payload_type_opus);
+	if (rtp_session_set_payload_type(session, 120) != 0)
 		abort();
 
 	/* tx */

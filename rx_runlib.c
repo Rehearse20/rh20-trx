@@ -31,7 +31,6 @@ void *run_rx(rx_args *rx)
 			return (void *)-1;
 
 		/* Follow the RFC, payload 0 has 8kHz reference rate */
-
 		ts += r * 8000 / rx->rate;
 	}
 }
