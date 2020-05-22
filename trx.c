@@ -19,6 +19,7 @@
 
 #include <netdb.h>
 #include <string.h>
+#include <signal.h>
 #include <alsa/asoundlib.h>
 #include <opus/opus.h>
 #include <ortp/ortp.h>
@@ -80,6 +81,21 @@ static void usage(FILE *fd)
 		"at 48000Hz the permitted values are 120, 240, 480 or 960.\n");
 }
 
+static RtpSession *session = NULL;
+
+static void report_rtcp_info(int signal)
+{
+	const struct jitter_stats *jitter = rtp_session_get_jitter_stats(session);
+	fprintf(stdout, "{\n");
+	fprintf(stdout, "  \"round-trip\": %f,\n", rtp_session_get_round_trip_propagation(session) * 1000);
+	fprintf(stdout, "  \"cum-loss\": %d,\n", rtp_session_get_cum_loss(session));
+	fprintf(stdout, "  \"recv-bandwidth\": %.0f,\n", rtp_session_get_recv_bandwidth(session));
+	fprintf(stdout, "  \"send-bandwidth\": %.0f,\n", rtp_session_compute_send_bandwidth(session));
+	fprintf(stdout, "  \"jitter\": [%d, %d, %f]\n", jitter->jitter, jitter->max_jitter, jitter->jitter_buffer_size_ms);
+	fprintf(stdout, "}\n");
+	fflush(stdout);
+}
+
 int main(int argc, char *argv[])
 {
 	int r, error;
@@ -104,7 +120,9 @@ int main(int argc, char *argv[])
 		tx_port = DEFAULT_PORT;
 	uint32_t ssrc = DEFAULT_SSRC;
 
-	fputs(COPYRIGHT "\n", stderr);
+	struct sigaction action = {
+ 		.sa_handler = &report_rtcp_info
+	};
 
 	for (;;) {
 		int c;
@@ -183,8 +201,10 @@ int main(int argc, char *argv[])
 	ortp_init();
 	ortp_scheduler_init();
 	ortp_set_log_level_mask(NULL, ORTP_WARNING|ORTP_ERROR);
-	rx.session  = tx.session = create_rtp_send_recv(tx_addr, tx_port, "0.0.0.0", rx_port, jitter, ssrc);
-	assert(rx.session != NULL);
+	session = rx.session  = tx.session = create_rtp_send_recv(tx_addr, tx_port, "0.0.0.0", rx_port, jitter, ssrc);
+	assert(session != NULL);
+
+ 	sigaction(SIGUSR1, &action, NULL);
 
 	r = snd_pcm_open(&tx.snd, device, SND_PCM_STREAM_CAPTURE, 0);
 	if (r < 0) {
