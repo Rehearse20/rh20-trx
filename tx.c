@@ -77,6 +77,7 @@ int main(int argc, char *argv[])
 	struct tx_args tx = {
 		.channels = DEFAULT_CHANNELS,
 		.frame = DEFAULT_FRAME,
+		.nr_sessions = 1
 	};
 
 	/* command-line options */
@@ -134,6 +135,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	tx.sessions = calloc(1, sizeof(RtpSession *));
+
 	tx.encoder = opus_encoder_create(rate, tx.channels, OPUS_APPLICATION_AUDIO,
 				&error);
 	if (tx.encoder == NULL) {
@@ -151,8 +154,8 @@ int main(int argc, char *argv[])
 	ortp_init();
 	ortp_scheduler_init();
 	ortp_set_log_level_mask(NULL, ORTP_WARNING|ORTP_ERROR);
-	tx.session = create_rtp_send(addr, port);
-	assert(tx.session != NULL);
+	tx.sessions[0] = create_rtp_send(addr, port);
+	assert(tx.sessions[0] != NULL);
 
 	r = snd_pcm_open(&tx.snd, device, SND_PCM_STREAM_CAPTURE, 0);
 	if (r < 0) {
@@ -173,7 +176,7 @@ int main(int argc, char *argv[])
 	if (snd_pcm_close(tx.snd) < 0)
 		abort();
 
-	rtp_session_destroy(tx.session);
+	rtp_session_destroy(tx.sessions[0]);
 	ortp_exit();
 	ortp_global_stats_display();
 

@@ -13,7 +13,8 @@ struct tx_args
 	OpusEncoder *encoder;
 	size_t bytes_per_frame;
 	unsigned int ts_per_frame;
-	RtpSession *session;
+	int nr_sessions;
+	RtpSession **sessions;
 };
 
 void *run_tx(struct tx_args *args);

@@ -11,6 +11,7 @@ int send_one_frame(snd_pcm_t *snd,
 		OpusEncoder *encoder,
 		const size_t bytes_per_frame,
 		const unsigned int ts_per_frame,
-		RtpSession *session);
+		const int nr_sessions,
+		RtpSession **sessions);
 
 #endif

@@ -7,8 +7,10 @@ int send_one_frame(snd_pcm_t *snd,
 		OpusEncoder *encoder,
 		const size_t bytes_per_frame,
 		const unsigned int ts_per_frame,
-		RtpSession *session)
+		const int nr_sessions,
+		RtpSession **sessions)
 {
+	int i;
 	int16_t *pcm;
 	void *packet;
 	ssize_t z;
@@ -46,7 +48,9 @@ int send_one_frame(snd_pcm_t *snd,
 		return -1;
 	}
 
-	rtp_session_send_with_ts(session, packet, z, ts);
+	for (i = 0; i < nr_sessions; i++) {
+		rtp_session_send_with_ts(sessions[i], packet, z, ts);
+	}
 	ts += ts_per_frame;
 
 	return 0;

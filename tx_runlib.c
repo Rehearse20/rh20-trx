@@ -10,7 +10,7 @@ void *run_tx(struct tx_args *tx)
 
 		r = send_one_frame(tx->snd, tx->channels, tx->frame,
 				tx->encoder, tx->bytes_per_frame, tx->ts_per_frame,
-				tx->session);
+				tx->nr_sessions, tx->sessions);
 		if (r == -1)
 			return (void *)-1;
 
