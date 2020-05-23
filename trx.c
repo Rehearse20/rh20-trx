@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
 	{
 		int c;
 
-		c = getopt(argc, argv, "b:c:d:f:h:j:m:n:p:r:s:v:D:S:x");
+		c = getopt(argc, argv, "b:c:d:f:h:j:m:n:p:r:s:v:D:S:x:");
 		if (c == -1)
 			break;
 
@@ -180,6 +180,15 @@ int main(int argc, char *argv[])
 		// combining explicit and extended (multiple) connection arguments is not supported
 		usage(stderr);
 		return -1;
+	}
+	if (using_extended_connections)
+	{
+		// determine how many hosts there are
+		const char *str = extended_connections;
+		nr_hosts = 1;
+		while (*str)
+			if (*str++ == ',')
+				++nr_hosts;
 	}
 
 	rx = calloc(nr_hosts, sizeof(struct rx_args));
