@@ -74,7 +74,7 @@ static void usage(FILE *fd)
 int main(int argc, char *argv[])
 {
 	int r, error;
-	tx_args tx = {
+	struct tx_args tx = {
 		.channels = DEFAULT_CHANNELS,
 		.frame = DEFAULT_FRAME,
 	};

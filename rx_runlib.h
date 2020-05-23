@@ -5,14 +5,14 @@
 #include <opus/opus.h>
 #include <ortp/ortp.h>
 
-typedef struct {
+struct rx_args {
 	RtpSession *session;
 	OpusDecoder *decoder;
 	snd_pcm_t *snd;
 	unsigned int channels;
 	unsigned int rate;
-} rx_args;
+};
 
-void *run_rx(rx_args *args);
+void *run_rx(struct rx_args *args);
 
 #endif

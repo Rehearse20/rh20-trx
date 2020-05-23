@@ -3,7 +3,7 @@
 
 extern unsigned int verbose;
 
-void *run_tx(tx_args *tx)
+void *run_tx(struct tx_args *tx)
 {
 	for (;;) {
 		int r;

@@ -5,7 +5,8 @@
 #include <opus/opus.h>
 #include <ortp/ortp.h>
 
-typedef struct {
+struct tx_args
+{
 	snd_pcm_t *snd;
 	unsigned int channels;
 	snd_pcm_uframes_t frame;
@@ -13,8 +14,8 @@ typedef struct {
 	size_t bytes_per_frame;
 	unsigned int ts_per_frame;
 	RtpSession *session;
-} tx_args;
+};
 
-void *run_tx(tx_args *args);
+void *run_tx(struct tx_args *args);
 
 #endif

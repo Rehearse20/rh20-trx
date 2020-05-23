@@ -3,7 +3,7 @@
 
 extern unsigned int verbose;
 
-void *run_rx(rx_args *rx)
+void *run_rx(struct rx_args *rx)
 {
 	int ts = 0;
 
