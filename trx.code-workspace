@@ -11,6 +11,8 @@
 			"*.o": true,
 			"*x": true,
 			"*.code-workspace": true,
-		}
+		},
+		"editor.formatOnSave": true,
+		"editor.formatOnType": true
 	}
 }
