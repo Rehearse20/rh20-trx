@@ -9,6 +9,8 @@
 			"**/.git": true,
 			"*.d": true,
 			"*.o": true,
+			"*x": true,
+			"*.code-workspace": true,
 		}
 	}
 }
