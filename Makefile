@@ -7,7 +7,8 @@ INSTALL ?= install
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 
-CFLAGS += -MMD -Wall
+# TODO: -g needed for debugging, remove for release?
+CFLAGS += -MMD -Wall -g
 
 LDLIBS_ASOUND ?= -lasound
 LDLIBS_PTHREAD ?= -lpthread
