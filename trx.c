@@ -20,6 +20,7 @@
 #include <stdbool.h>
 #include <netdb.h>
 #include <string.h>
+#include <signal.h>
 #include <alsa/asoundlib.h>
 #include <opus/opus.h>
 #include <ortp/ortp.h>
@@ -43,46 +44,65 @@ unsigned int verbose = DEFAULT_VERBOSE;
 static void usage(FILE *fd)
 {
 	fprintf(fd, "Usage: trx [<parameters>]\n"
-				"Real-time audio transmitter over IP\n");
+							"Real-time audio transmitter over IP\n");
 
 	fprintf(fd, "\nAudio device (ALSA) parameters:\n");
 	fprintf(fd, "  -d <dev>    Device name (default '%s')\n",
-			DEFAULT_DEVICE);
+					DEFAULT_DEVICE);
 	fprintf(fd, "  -m <ms>     Buffer time (default %d milliseconds)\n",
-			DEFAULT_BUFFER);
+					DEFAULT_BUFFER);
 
 	fprintf(fd, "\nNetwork parameters:\n");
 	fprintf(fd, "  -n <n>      Number of host properties passed in\n");
 	fprintf(fd, "  -h <addr>   IP address to send to (default %s)\n",
-			DEFAULT_ADDR);
+					DEFAULT_ADDR);
 	fprintf(fd, "  -p <port>   UDP port number to receive on (default %d)\n",
-			DEFAULT_PORT);
+					DEFAULT_PORT);
 	fprintf(fd, "  -s <port>   UDP port number to send to (default %d)\n",
-			DEFAULT_PORT);
+					DEFAULT_PORT);
 	fprintf(fd, "  -j <ms>     Jitter buffer (default %d milliseconds)\n",
-			DEFAULT_JITTER);
+					DEFAULT_JITTER);
 	fprintf(fd, "  -S <ssrc>   SSRC (default 0x%x)\n",
-			DEFAULT_SSRC);
+					DEFAULT_SSRC);
 	fprintf(fd, "  -x <data>   Extended Connections (comma seperated ssrc@localport!remoteip:remoteport)\n");
 	fprintf(fd, "\nExtended connections (-x) cannot be combined with explicit settings (-h, -p -s -S)\n");
 
 	fprintf(fd, "\nEncoding parameters:\n");
 	fprintf(fd, "  -r <rate>   Sample rate (default %dHz)\n",
-			DEFAULT_RATE);
+					DEFAULT_RATE);
 	fprintf(fd, "  -c <n>      Number of channels (default %d)\n",
-			DEFAULT_CHANNELS);
+					DEFAULT_CHANNELS);
 	fprintf(fd, "  -f <n>      Frame size (default %d samples, see below)\n",
-			DEFAULT_FRAME);
+					DEFAULT_FRAME);
 	fprintf(fd, "  -b <kbps>   Bitrate (approx., default %d)\n",
-			DEFAULT_BITRATE);
+					DEFAULT_BITRATE);
 
 	fprintf(fd, "\nProgram parameters:\n");
 	fprintf(fd, "  -v <n>      Verbosity level (default %d)\n",
-			DEFAULT_VERBOSE);
+					DEFAULT_VERBOSE);
 	fprintf(fd, "  -D <file>   Run as a daemon, writing process ID to the given file\n");
 
 	fprintf(fd, "\nAllowed frame sizes (-f) are defined by the Opus codec. For example,\n"
-				"at 48000Hz the permitted values are 120, 240, 480 or 960.\n");
+							"at 48000Hz the permitted values are 120, 240, 480 or 960.\n");
+}
+
+int nr_hosts = 1;
+static RtpSession **sessions = NULL;
+static void report_rtcp_info(int signal)
+{
+	int i;
+	for (i = 0; i < nr_hosts; i++)
+	{
+		const struct jitter_stats *jitter = rtp_session_get_jitter_stats(sessions[i]);
+		fprintf(stdout, "{\n");
+		fprintf(stdout, "  \"round-trip\": %f,\n", rtp_session_get_round_trip_propagation(sessions[i]) * 1000);
+		fprintf(stdout, "  \"cum-loss\": %d,\n", rtp_session_get_cum_loss(sessions[i]));
+		fprintf(stdout, "  \"recv-bandwidth\": %.0f,\n", rtp_session_get_recv_bandwidth(sessions[i]));
+		fprintf(stdout, "  \"send-bandwidth\": %.0f,\n", rtp_session_compute_send_bandwidth(sessions[i]));
+		fprintf(stdout, "  \"jitter\": [%d, %d, %f]\n", jitter->jitter, jitter->max_jitter, jitter->jitter_buffer_size_ms);
+		fprintf(stdout, "}\n");
+	}
+	fflush(stdout);
 }
 
 /* The following is the size of a buffer to contain any error messages
@@ -110,29 +130,30 @@ static int compile_regex(regex_t *r, const char *regex_text)
 
 int main(int argc, char *argv[])
 {
-	int i, r, error, nr_hosts = 1;
+	int i, r, error;
 	struct tx_args tx;
 	struct rx_args *rx;
 	pthread_t tx_thread, *rx_threads;
 
 	/* command-line options */
 	const char *device = DEFAULT_DEVICE,
-			   *tx_addr = DEFAULT_ADDR,
-			   *pid = NULL;
+						 *tx_addr = DEFAULT_ADDR,
+						 *pid = NULL;
 	char *extended_connections = NULL;
 	unsigned int buffer = DEFAULT_BUFFER,
-				 channels = DEFAULT_CHANNELS,
-				 frame = DEFAULT_FRAME,
-				 jitter = DEFAULT_JITTER,
-				 kbps = DEFAULT_BITRATE,
-				 rate = DEFAULT_RATE,
-				 rx_port = DEFAULT_PORT,
-				 tx_port = DEFAULT_PORT;
+							 channels = DEFAULT_CHANNELS,
+							 frame = DEFAULT_FRAME,
+							 jitter = DEFAULT_JITTER,
+							 kbps = DEFAULT_BITRATE,
+							 rate = DEFAULT_RATE,
+							 rx_port = DEFAULT_PORT,
+							 tx_port = DEFAULT_PORT;
 	uint32_t ssrc = DEFAULT_SSRC;
 	bool using_extended_connections = false;
 	bool using_explicit_connection = false;
 
-	fputs(COPYRIGHT "\n", stderr);
+	struct sigaction action = {
+			.sa_handler = &report_rtcp_info};
 
 	for (;;)
 	{
@@ -218,14 +239,14 @@ int main(int argc, char *argv[])
 	rx = calloc(nr_hosts, sizeof(struct rx_args));
 	rx_threads = calloc(nr_hosts, sizeof(pthread_t));
 	tx.nr_sessions = nr_hosts;
-	tx.sessions = calloc(nr_hosts, sizeof(RtpSession *));
+	sessions = tx.sessions = calloc(nr_hosts, sizeof(RtpSession *));
 
 	tx.encoder = opus_encoder_create(rate, channels, OPUS_APPLICATION_AUDIO,
-									 &error);
+																	 &error);
 	if (tx.encoder == NULL)
 	{
 		fprintf(stderr, "opus_encoder_create: %s\n",
-				opus_strerror(error));
+						opus_strerror(error));
 		return -1;
 	}
 
@@ -237,6 +258,8 @@ int main(int argc, char *argv[])
 	ortp_init();
 	ortp_scheduler_init();
 	ortp_set_log_level_mask(NULL, ORTP_WARNING | ORTP_ERROR);
+
+	sigaction(SIGUSR1, &action, NULL);
 
 	r = snd_pcm_open(&tx.snd, device, SND_PCM_STREAM_CAPTURE, 0);
 	if (r < 0)
@@ -329,7 +352,7 @@ int main(int argc, char *argv[])
 		if (rx[i].decoder == NULL)
 		{
 			fprintf(stderr, "opus_decoder_create: %s\n",
-					opus_strerror(error));
+							opus_strerror(error));
 			return -1;
 		}
 
