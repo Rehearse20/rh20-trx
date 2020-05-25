@@ -159,7 +159,7 @@ int main(int argc, char *argv[])
 	{
 		int c;
 
-		c = getopt(argc, argv, "b:c:d:f:h:j:m:n:p:r:s:v:D:S:x:");
+		c = getopt(argc, argv, "b:c:d:f:h:j:m:p:r:s:v:D:S:x:");
 		if (c == -1)
 			break;
 
@@ -186,9 +186,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'm':
 			buffer = atoi(optarg);
-			break;
-		case 'n':
-			nr_hosts = atoi(optarg);
 			break;
 		case 'p':
 			rx_port = atoi(optarg);
