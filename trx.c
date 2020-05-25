@@ -86,6 +86,59 @@ static void usage(FILE *fd)
 							"at 48000Hz the permitted values are 120, 240, 480 or 960.\n");
 }
 
+struct connection_info
+{
+	uint32_t ssrc;
+	unsigned int rx_port;
+	char *tx_addr;
+	unsigned int tx_port;
+};
+
+struct connection_info *parse_extended_connections(const char *arg, int *nr_hosts)
+{
+	struct connection_info *connections;
+	char *extended_connections = strdup(arg);
+	int i;
+	// determine how many hosts there are
+	const char *str = arg;
+	*nr_hosts = 1;
+	while (*str)
+		if (*str++ == ',')
+			++*nr_hosts;
+
+	connections = calloc(*nr_hosts, sizeof(struct connection_info));
+
+	char *rest_host_connection = NULL;
+	char *host_connection = strtok_r(extended_connections, ",", &rest_host_connection);
+	for (i = 0; i < *nr_hosts; i++)
+	{
+		char *rest_host_token_split = NULL;
+		printf("host: '%s'\n", host_connection);
+		// this code expects the following format "<ssrc>@<localport>#<remoteip>:<remoteport>"
+		char *host_token_split = strtok_r(host_connection, "@", &rest_host_token_split);
+		printf("%s, %s\n", host_token_split, rest_host_token_split);
+		connections[i].ssrc = atoi(host_token_split);
+
+		host_token_split = strtok_r(NULL, "#", &rest_host_token_split);
+		printf("%s, %s\n", host_token_split, rest_host_token_split);
+		connections[i].rx_port = atoi(host_token_split);
+
+		host_token_split = strtok_r(NULL, ":", &rest_host_token_split);
+		printf("%s, %s\n", host_token_split, rest_host_token_split);
+		connections[i].tx_addr = strdup(host_token_split);
+
+		connections[i].tx_port = atoi(rest_host_token_split);
+
+		printf("decoded host connection : ssrc:%u, rx_port:%u, tx_addr:%s, tx_port:%u\n",
+					 connections[i].ssrc, connections[i].rx_port,
+					 connections[i].tx_addr, connections[i].tx_port);
+		host_connection = strtok_r(NULL, ",", &rest_host_connection);
+	}
+	free(extended_connections);
+
+	return connections;
+}
+
 int nr_hosts = 1;
 static RtpSession **sessions = NULL;
 static void report_rtcp_info(int signal)
@@ -105,29 +158,6 @@ static void report_rtcp_info(int signal)
 	fflush(stdout);
 }
 
-/* The following is the size of a buffer to contain any error messages
-   encountered when the regular expression is compiled. */
-
-#define MAX_ERROR_MSG 0x1000
-
-/* Compile the regular expression described by "regex_text" into
-   "r". */
-/*
-static int compile_regex(regex_t *r, const char *regex_text)
-{
-	int status = regcomp(r, regex_text, REG_EXTENDED); // | REG_NEWLINE);
-	if (status != 0)
-	{
-		char error_message[MAX_ERROR_MSG];
-		regerror(status, r, error_message, MAX_ERROR_MSG);
-		printf("Regex error compiling '%s': %s\n",
-			   regex_text, error_message);
-		return 1;
-	}
-	return 0;
-}
-*/
-
 int main(int argc, char *argv[])
 {
 	int i, r, error;
@@ -137,18 +167,21 @@ int main(int argc, char *argv[])
 
 	/* command-line options */
 	const char *device = DEFAULT_DEVICE,
-						 *tx_addr = DEFAULT_ADDR,
 						 *pid = NULL;
-	char *extended_connections = NULL;
 	unsigned int buffer = DEFAULT_BUFFER,
 							 channels = DEFAULT_CHANNELS,
 							 frame = DEFAULT_FRAME,
 							 jitter = DEFAULT_JITTER,
 							 kbps = DEFAULT_BITRATE,
-							 rate = DEFAULT_RATE,
-							 rx_port = DEFAULT_PORT,
-							 tx_port = DEFAULT_PORT;
-	uint32_t ssrc = DEFAULT_SSRC;
+							 rate = DEFAULT_RATE;
+	struct connection_info *connections = NULL;
+	struct connection_info explicit_connection =
+			{
+					.ssrc = DEFAULT_SSRC,
+					.rx_port = DEFAULT_PORT,
+					.tx_addr = DEFAULT_ADDR,
+					.tx_port = DEFAULT_PORT,
+			};
 	bool using_extended_connections = false;
 	bool using_explicit_connection = false;
 
@@ -178,7 +211,7 @@ int main(int argc, char *argv[])
 			frame = atol(optarg);
 			break;
 		case 'h':
-			tx_addr = optarg;
+			explicit_connection.tx_addr = optarg;
 			using_explicit_connection = true;
 			break;
 		case 'j':
@@ -188,18 +221,18 @@ int main(int argc, char *argv[])
 			buffer = atoi(optarg);
 			break;
 		case 'p':
-			rx_port = atoi(optarg);
+			explicit_connection.rx_port = atoi(optarg);
 			using_explicit_connection = true;
 			break;
 		case 'r':
 			rate = atoi(optarg);
 			break;
 		case 's':
-			tx_port = atoi(optarg);
+			explicit_connection.tx_port = atoi(optarg);
 			using_explicit_connection = true;
 			break;
 		case 'S':
-			ssrc = atoi(optarg);
+			explicit_connection.ssrc = atoi(optarg);
 			using_explicit_connection = true;
 			break;
 		case 'v':
@@ -209,7 +242,7 @@ int main(int argc, char *argv[])
 			pid = optarg;
 			break;
 		case 'x':
-			extended_connections = strdup(optarg);
+			connections = parse_extended_connections(optarg, &nr_hosts);
 			using_extended_connections = true;
 			break;
 		default:
@@ -217,20 +250,17 @@ int main(int argc, char *argv[])
 			return -1;
 		}
 	}
+
 	if (using_extended_connections && using_explicit_connection)
 	{
 		// combining explicit and extended (multiple) connection arguments is not supported
 		usage(stderr);
 		return -1;
 	}
-	if (using_extended_connections)
+	if (!using_extended_connections)
 	{
-		// determine how many hosts there are
-		const char *str = extended_connections;
 		nr_hosts = 1;
-		while (*str)
-			if (*str++ == ',')
-				++nr_hosts;
+		connections = &explicit_connection;
 	}
 
 	rx = calloc(nr_hosts, sizeof(struct rx_args));
@@ -269,91 +299,17 @@ int main(int argc, char *argv[])
 	if (set_alsa_sw(tx.snd) == -1)
 		return -1;
 
-	/* REGEX code does not work as expected yet, so that's why it is commented out.
-	   fallback for now is to use strtok on each host connection string
-	char *host_regex_text = "(\\d+)@(\\d+)#(\\d+\\.\\d+\\.\\d+\\.\\d+):(\\d+)"; // "(ssrc)@(localport)\\#(remoteip):(remoteport)";
-	// 12@34#5.6.7.8:9
-	regex_t regexCompiled;
-	compile_regex(&regexCompiled, host_regex_text);
-	*/
-
-	char *rest_host_connection = NULL;
-	char *host_connection = NULL;
-	char *connection = NULL;
-
-	if (using_extended_connections)
-	{
-		rest_host_connection = extended_connections;
-		host_connection = strtok_r(extended_connections, ",", &rest_host_connection);
-	}
-
 	for (i = 0; i < nr_hosts; i++)
 	{
-		if (using_extended_connections)
-		{
-			printf("host: '%s'\n", host_connection);
-
-			connection = strdup(host_connection);
-			char *rest_host_token_split = connection;
-
-			// this code expects the following format "(ssrc)@(localport)#(remoteip):(remoteport)"
-			char *host_token_split = strtok_r(connection, "@#:", &rest_host_token_split);
-			ssrc = atoi(host_token_split);
-			host_token_split = strtok_r(NULL, "@#:", &rest_host_token_split);
-			rx_port = atoi(host_token_split);
-			host_token_split = strtok_r(NULL, "@#:", &rest_host_token_split);
-			tx_addr = host_token_split;
-			host_token_split = strtok_r(NULL, "@#:", &rest_host_token_split);
-			tx_port = atoi(host_token_split);
-
-			printf("decoded host connection : ssrc:%d, rx_port:%d, tx_addr:%s, tx_port:%d\n", ssrc, rx_port, tx_addr, tx_port);
-
-			/*
-			size_t maxMatches = 1;
-			size_t maxGroups = 5;
-			regmatch_t groupArray[maxGroups];
-			unsigned int m = 0;
-			char *cursor = host_connection;
-			int result = regexec(&regexCompiled, cursor, maxGroups, groupArray, 0);
-
-			if (result != 0)
-			{
-				// could not find anything, stop?
-				printf("could not find a match in %s, %d\n", host_connection, result);
-				return -1;
-			}
-
-			unsigned int g = 0;
-			unsigned int offset = 0;
-			for (g = 0; g < maxGroups; g++)
-			{
-				if (groupArray[g].rm_so == (size_t)-1)
-					break; // No more groups
-
-				if (g == 0)
-					offset = groupArray[g].rm_eo;
-
-				char cursorCopy[strlen(cursor) + 1];
-				strcpy(cursorCopy, cursor);
-				cursorCopy[groupArray[g].rm_eo] = 0;
-				printf("Match %u, Group %u: [%2u-%2u]: %s\n",
-					m, g, groupArray[g].rm_so, groupArray[g].rm_eo,
-					cursorCopy + groupArray[g].rm_so);
-			}
-			cursor += offset;
-			*/
-		}
-
-		printf("setting up decoded host connection[%d] : ssrc:%d, rx_port:%d, tx_addr:%s, tx_port:%d\n", i, ssrc, rx_port, tx_addr, tx_port);
+		printf("setting up decoded host connection[%d] : ssrc:%u, rx_port:%u, tx_addr:%s, tx_port:%u\n", i, connections[i].ssrc, connections[i].rx_port, connections[i].tx_addr, connections[i].tx_port);
 		rx[i].decoder = opus_decoder_create(rate, channels, &error);
 		if (rx[i].decoder == NULL)
 		{
-			fprintf(stderr, "opus_decoder_create: %s\n",
-							opus_strerror(error));
+			fprintf(stderr, "opus_decoder_create: %s\n", opus_strerror(error));
 			return -1;
 		}
 
-		rx[i].session = tx.sessions[i] = create_rtp_send_recv(tx_addr, tx_port, "0.0.0.0", rx_port, jitter, ssrc);
+		rx[i].session = tx.sessions[i] = create_rtp_send_recv(connections[i].tx_addr, connections[i].tx_port, "0.0.0.0", connections[i].rx_port, jitter, connections[i].ssrc);
 		assert(rx[i].session != NULL);
 
 		r = snd_pcm_open(&rx[i].snd, device, SND_PCM_STREAM_PLAYBACK, 0);
@@ -366,13 +322,6 @@ int main(int argc, char *argv[])
 			return -1;
 		if (set_alsa_sw(rx[i].snd) == -1)
 			return -1;
-
-		if (using_extended_connections)
-		{
-			if (connection)
-				free(connection);
-			host_connection = strtok_r(NULL, ",", &rest_host_connection);
-		}
 	}
 
 	if (pid)
@@ -412,10 +361,12 @@ int main(int argc, char *argv[])
 		rtp_session_destroy(rx[i].session);
 
 		opus_decoder_destroy(rx[i].decoder);
+
+		free(connections[i].tx_addr);
 	}
 
-	if (extended_connections)
-		free(extended_connections);
+	if (using_extended_connections)
+		free(connections);
 
 	return r;
 }
