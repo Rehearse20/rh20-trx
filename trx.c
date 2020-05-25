@@ -92,6 +92,7 @@ struct connection_info
 	unsigned int rx_port;
 	char *tx_addr;
 	unsigned int tx_port;
+	RtpSession *session;
 };
 
 struct connection_info *parse_extended_connections(const char *arg, int *nr_hosts)
@@ -140,21 +141,25 @@ struct connection_info *parse_extended_connections(const char *arg, int *nr_host
 }
 
 int nr_hosts = 1;
-static RtpSession **sessions = NULL;
+struct connection_info *connections = NULL;
 static void report_rtcp_info(int signal)
 {
 	int i;
+	fprintf(stdout, "{\n");
 	for (i = 0; i < nr_hosts; i++)
 	{
-		const struct jitter_stats *jitter = rtp_session_get_jitter_stats(sessions[i]);
-		fprintf(stdout, "{\n");
-		fprintf(stdout, "  \"round-trip\": %f,\n", rtp_session_get_round_trip_propagation(sessions[i]) * 1000);
-		fprintf(stdout, "  \"cum-loss\": %d,\n", rtp_session_get_cum_loss(sessions[i]));
-		fprintf(stdout, "  \"recv-bandwidth\": %.0f,\n", rtp_session_get_recv_bandwidth(sessions[i]));
-		fprintf(stdout, "  \"send-bandwidth\": %.0f,\n", rtp_session_compute_send_bandwidth(sessions[i]));
-		fprintf(stdout, "  \"jitter\": [%d, %d, %f]\n", jitter->jitter, jitter->max_jitter, jitter->jitter_buffer_size_ms);
-		fprintf(stdout, "}\n");
+		RtpSession *session = connections[i].session;
+		const struct jitter_stats *jitter = rtp_session_get_jitter_stats(session);
+		fprintf(stdout, "  \"%u@%u#%s:%u\": {\n", connections[i].ssrc, connections[i].rx_port,
+						connections[i].tx_addr, connections[i].tx_port);
+		fprintf(stdout, "    \"round-trip\": %f,\n", rtp_session_get_round_trip_propagation(session) * 1000);
+		fprintf(stdout, "    \"cum-loss\": %d,\n", rtp_session_get_cum_loss(session));
+		fprintf(stdout, "    \"recv-bandwidth\": %.0f,\n", rtp_session_get_recv_bandwidth(session));
+		fprintf(stdout, "    \"send-bandwidth\": %.0f,\n", rtp_session_compute_send_bandwidth(session));
+		fprintf(stdout, "    \"jitter\": [%d, %d, %f]\n", jitter->jitter, jitter->max_jitter, jitter->jitter_buffer_size_ms);
+		fprintf(stdout, "  }\n");
 	}
+	fprintf(stdout, "}\n");
 	fflush(stdout);
 }
 
@@ -174,7 +179,6 @@ int main(int argc, char *argv[])
 							 jitter = DEFAULT_JITTER,
 							 kbps = DEFAULT_BITRATE,
 							 rate = DEFAULT_RATE;
-	struct connection_info *connections = NULL;
 	struct connection_info explicit_connection =
 			{
 					.ssrc = DEFAULT_SSRC,
@@ -266,7 +270,7 @@ int main(int argc, char *argv[])
 	rx = calloc(nr_hosts, sizeof(struct rx_args));
 	rx_threads = calloc(nr_hosts, sizeof(pthread_t));
 	tx.nr_sessions = nr_hosts;
-	sessions = tx.sessions = calloc(nr_hosts, sizeof(RtpSession *));
+	tx.sessions = calloc(nr_hosts, sizeof(RtpSession *));
 
 	tx.encoder = opus_encoder_create(rate, channels, OPUS_APPLICATION_AUDIO,
 																	 &error);
@@ -309,8 +313,11 @@ int main(int argc, char *argv[])
 			return -1;
 		}
 
-		rx[i].session = tx.sessions[i] = create_rtp_send_recv(connections[i].tx_addr, connections[i].tx_port, "0.0.0.0", connections[i].rx_port, jitter, connections[i].ssrc);
-		assert(rx[i].session != NULL);
+		connections[i].session = create_rtp_send_recv(connections[i].tx_addr, connections[i].tx_port,
+																									"0.0.0.0", connections[i].rx_port,
+																									jitter, connections[i].ssrc);
+		assert(connections[i].session != NULL);
+		rx[i].session = tx.sessions[i] = connections[i].session;
 
 		r = snd_pcm_open(&rx[i].snd, device, SND_PCM_STREAM_PLAYBACK, 0);
 		if (r < 0)
