@@ -47,7 +47,9 @@ static void usage(FILE *fd)
 							"Real-time audio transmitter over IP\n");
 
 	fprintf(fd, "\nAudio device (ALSA) parameters:\n");
-	fprintf(fd, "  -d <dev>    Device name (default '%s')\n",
+	fprintf(fd, "  -C <dev>    Capture device name (default '%s')\n",
+					DEFAULT_DEVICE);
+	fprintf(fd, "  -P <dev>    Playback device name (default '%s')\n",
 					DEFAULT_DEVICE);
 	fprintf(fd, "  -m <ms>     Buffer time (default %d milliseconds)\n",
 					DEFAULT_BUFFER);
@@ -136,7 +138,8 @@ int main(int argc, char *argv[])
 	pthread_t tx_thread, *rx_threads;
 
 	/* command-line options */
-	const char *device = DEFAULT_DEVICE,
+	const char *capture_device = DEFAULT_DEVICE,
+						 *playback_device = DEFAULT_DEVICE,
 						 *tx_addr = DEFAULT_ADDR,
 						 *pid = NULL;
 	char *extended_connections = NULL;
@@ -159,7 +162,7 @@ int main(int argc, char *argv[])
 	{
 		int c;
 
-		c = getopt(argc, argv, "b:c:d:f:h:j:m:n:p:r:s:v:D:S:x:");
+		c = getopt(argc, argv, "b:c:f:h:j:m:n:p:r:s:v:x:C:D:P:S:");
 		if (c == -1)
 			break;
 
@@ -170,9 +173,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'c':
 			channels = atoi(optarg);
-			break;
-		case 'd':
-			device = optarg;
 			break;
 		case 'f':
 			frame = atol(optarg);
@@ -201,19 +201,25 @@ int main(int argc, char *argv[])
 			tx_port = atoi(optarg);
 			using_explicit_connection = true;
 			break;
-		case 'S':
-			ssrc = atoi(optarg);
-			using_explicit_connection = true;
-			break;
 		case 'v':
 			verbose = atoi(optarg);
-			break;
-		case 'D':
-			pid = optarg;
 			break;
 		case 'x':
 			extended_connections = strdup(optarg);
 			using_extended_connections = true;
+			break;
+		case 'C':
+			capture_device = optarg;
+			break;
+		case 'D':
+			pid = optarg;
+			break;
+		case 'P':
+			playback_device = optarg;
+			break;
+		case 'S':
+			ssrc = atoi(optarg);
+			using_explicit_connection = true;
 			break;
 		default:
 			usage(stderr);
@@ -261,7 +267,7 @@ int main(int argc, char *argv[])
 
 	sigaction(SIGUSR1, &action, NULL);
 
-	r = snd_pcm_open(&tx.snd, device, SND_PCM_STREAM_CAPTURE, 0);
+	r = snd_pcm_open(&tx.snd, capture_device, SND_PCM_STREAM_CAPTURE, 0);
 	if (r < 0)
 	{
 		aerror("snd_pcm_open", r);
@@ -359,7 +365,7 @@ int main(int argc, char *argv[])
 		rx[i].session = tx.sessions[i] = create_rtp_send_recv(tx_addr, tx_port, "0.0.0.0", rx_port, jitter, ssrc);
 		assert(rx[i].session != NULL);
 
-		r = snd_pcm_open(&rx[i].snd, device, SND_PCM_STREAM_PLAYBACK, 0);
+		r = snd_pcm_open(&rx[i].snd, playback_device, SND_PCM_STREAM_PLAYBACK, 0);
 		if (r < 0)
 		{
 			aerror("snd_pcm_open", r);
