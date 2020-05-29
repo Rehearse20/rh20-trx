@@ -137,6 +137,7 @@ struct connection_info *parse_extended_connections(const char *arg, int *nr_host
 					 connections[i].tx_addr, connections[i].tx_port);
 		host_connection = strtok_r(NULL, ",", &rest_host_connection);
 	}
+	fflush(stdout);
 	free(extended_connections);
 
 	return connections;
@@ -311,7 +312,6 @@ int main(int argc, char *argv[])
 
 	for (i = 0; i < nr_hosts; i++)
 	{
-		printf("setting up decoded host connection[%d] : ssrc:%u, rx_port:%u, tx_addr:%s, tx_port:%u\n", i, connections[i].ssrc, connections[i].rx_port, connections[i].tx_addr, connections[i].tx_port);
 		rx[i].decoder = opus_decoder_create(rate, channels, &error);
 		if (rx[i].decoder == NULL)
 		{
