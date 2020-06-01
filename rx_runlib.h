@@ -2,13 +2,16 @@
 #define RX_RUNLIB_H
 
 #include <alsa/asoundlib.h>
+#include <portaudio.h>
 #include <opus/opus.h>
 #include <ortp/ortp.h>
 
-struct rx_args {
+struct rx_args
+{
 	RtpSession *session;
 	OpusDecoder *decoder;
 	snd_pcm_t *snd;
+	PaStream *stream;
 	unsigned int channels;
 	unsigned int rate;
 };

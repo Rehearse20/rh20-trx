@@ -8,14 +8,15 @@ PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 
 # TODO: -g needed for debugging, remove for release?
-CFLAGS += -MMD -Wall -g
+CFLAGS += -MMD -Wall
 
 LDLIBS_ASOUND ?= -lasound
+LDLIBS_PORTAUDIO ?= -lportaudio
 LDLIBS_PTHREAD ?= -lpthread
 LDLIBS_OPUS ?= -lopus
 LDLIBS_ORTP ?= -lortp
 
-LDLIBS += $(LDLIBS_ASOUND) $(LDLIBS_PTHREAD) $(LDLIBS_OPUS) $(LDLIBS_ORTP)
+LDLIBS += $(LDLIBS_ASOUND) $(LDLIBS_PORTAUDIO) $(LDLIBS_PTHREAD) $(LDLIBS_OPUS) $(LDLIBS_ORTP)
 
 .PHONY:		all install dist clean
 

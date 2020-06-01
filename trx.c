@@ -22,6 +22,7 @@
 #include <string.h>
 #include <signal.h>
 #include <alsa/asoundlib.h>
+#include <portaudio.h>
 #include <opus/opus.h>
 #include <ortp/ortp.h>
 #include <pthread.h>
@@ -299,16 +300,50 @@ int main(int argc, char *argv[])
 
 	sigaction(SIGUSR1, &action, NULL);
 
-	r = snd_pcm_open(&tx.snd, capture_device, SND_PCM_STREAM_CAPTURE, 0);
-	if (r < 0)
+	r = Pa_Initialize();
+	if (r != paNoError)
 	{
-		aerror("snd_pcm_open", r);
+		fprintf(stderr, "Pa_Initialize: %s\n", Pa_GetErrorText(r));
 		return -1;
 	}
-	if (set_alsa_hw(tx.snd, rate, channels, buffer * 1000) == -1)
+
+	PaStreamParameters inputParameters;
+	inputParameters.device = Pa_GetDefaultInputDevice(); /* default input device */
+	inputParameters.channelCount = channels;
+	inputParameters.sampleFormat = paInt16;
+	inputParameters.suggestedLatency = Pa_GetDeviceInfo(inputParameters.device)->defaultLowInputLatency;
+	inputParameters.hostApiSpecificStreamInfo = NULL;
+
+	r = Pa_OpenStream(
+			&tx.stream,
+			&inputParameters,
+			NULL,
+			rate,
+			frame,
+			paClipOff, /* we won't output out of range samples so don't bother clipping them */
+			NULL,			 /* no callback, use blocking API */
+			NULL);		 /* no callback, so no callback userData */
+	if (r != paNoError)
+	{
+		fprintf(stderr, "Pa_OpenStream: %s\n", Pa_GetErrorText(r));
 		return -1;
-	if (set_alsa_sw(tx.snd) == -1)
+	}
+	r = Pa_StartStream(tx.stream);
+	if (r != paNoError)
+	{
+		fprintf(stderr, "Pa_StartStream: %s\n", Pa_GetErrorText(r));
 		return -1;
+	}
+	// r = snd_pcm_open(&tx.snd, capture_device, SND_PCM_STREAM_CAPTURE, 0);
+	// if (r < 0)
+	// {
+	// 	aerror("snd_pcm_open", r);
+	// 	return -1;
+	// }
+	// if (set_alsa_hw(tx.snd, rate, channels, buffer * 1000) == -1)
+	// 	return -1;
+	// if (set_alsa_sw(tx.snd) == -1)
+	// 	return -1;
 
 	for (i = 0; i < nr_hosts; i++)
 	{
@@ -325,16 +360,43 @@ int main(int argc, char *argv[])
 		assert(connections[i].session != NULL);
 		rx[i].session = tx.sessions[i] = connections[i].session;
 
-		r = snd_pcm_open(&rx[i].snd, playback_device, SND_PCM_STREAM_PLAYBACK, 0);
-		if (r < 0)
+		PaStreamParameters outputParameters;
+		outputParameters.device = Pa_GetDefaultOutputDevice(); /* default output device */
+		outputParameters.channelCount = channels;
+		outputParameters.sampleFormat = paInt16;
+		outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultLowOutputLatency;
+		outputParameters.hostApiSpecificStreamInfo = NULL;
+
+		r = Pa_OpenStream(
+				&rx[i].stream,
+				NULL,
+				&outputParameters,
+				rate,
+				frame,
+				paClipOff, /* we won't output out of range samples so don't bother clipping them */
+				NULL,			 /* no callback, use blocking API */
+				NULL);		 /* no callback, so no callback userData */
+		if (r != paNoError)
 		{
-			aerror("snd_pcm_open", r);
+			fprintf(stderr, "Pa_OpenStream: %s\n", Pa_GetErrorText(r));
 			return -1;
 		}
-		if (set_alsa_hw(rx[i].snd, rate, channels, buffer * 1000) == -1)
+		r = Pa_StartStream(rx[i].stream);
+		if (r != paNoError)
+		{
+			fprintf(stderr, "Pa_StartStream: %s\n", Pa_GetErrorText(r));
 			return -1;
-		if (set_alsa_sw(rx[i].snd) == -1)
-			return -1;
+		}
+		// r = snd_pcm_open(&rx[i].snd, playback_device, SND_PCM_STREAM_PLAYBACK, 0);
+		// if (r < 0)
+		// {
+		// 	aerror("snd_pcm_open", r);
+		// 	return -1;
+		// }
+		// if (set_alsa_hw(rx[i].snd, rate, channels, buffer * 1000) == -1)
+		// 	return -1;
+		// if (set_alsa_sw(rx[i].snd) == -1)
+		// 	return -1;
 	}
 
 	if (pid)

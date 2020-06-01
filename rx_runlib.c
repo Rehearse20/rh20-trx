@@ -7,26 +7,30 @@ void *run_rx(struct rx_args *rx)
 {
 	int ts = 0;
 
-	for (;;) {
+	for (;;)
+	{
 		int r, have_more;
 		char buf[32768];
 		void *packet;
 
-		r = rtp_session_recv_with_ts(rx->session, (uint8_t*)buf,
-				sizeof(buf), ts, &have_more);
+		r = rtp_session_recv_with_ts(rx->session, (uint8_t *)buf,
+																 sizeof(buf), ts, &have_more);
 		assert(r >= 0);
 		assert(have_more == 0);
-		if (r == 0) {
+		if (r == 0)
+		{
 			packet = NULL;
 			if (verbose > 1)
 				fputc('#', stderr);
-		} else {
+		}
+		else
+		{
 			packet = buf;
 			if (verbose > 1)
 				fputc('.', stderr);
 		}
 
-		r = play_one_frame(packet, r, rx->decoder, rx->snd, rx->channels);
+		r = play_one_frame(packet, r, rx->decoder, rx->stream, rx->channels);
 		if (r == -1)
 			return (void *)-1;
 

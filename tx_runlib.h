@@ -2,12 +2,14 @@
 #define TX_RUNLIB_H
 
 #include <alsa/asoundlib.h>
+#include <portaudio.h>
 #include <opus/opus.h>
 #include <ortp/ortp.h>
 
 struct tx_args
 {
 	snd_pcm_t *snd;
+	PaStream *stream;
 	unsigned int channels;
 	snd_pcm_uframes_t frame;
 	OpusEncoder *encoder;
